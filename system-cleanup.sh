@@ -2,77 +2,92 @@
 
 # Function to clear the trash
 clear_trash() {
-  if [ -d "$HOME/.local/share/Trash/files" ]; then
-    # Clear the trash in GNOME
+  local trash_dir="$HOME/.local/share/Trash/files"
+  if [ -d "$trash_dir" ]; then
     echo "Clearing the trash..."
-    rm -rf "$HOME/.local/share/Trash/files/*"
+    rm -rf "$trash_dir/*"
     echo "Trash has been cleared."
   else
     echo "Trash directory not found."
   fi
 }
 
+# Function to perform a system update
+system_update() {
+  local pm=$1
+  case $pm in
+    apt)
+      sudo apt update && sudo apt upgrade -y
+      ;;
+    dnf)
+      sudo dnf check-update && sudo dnf upgrade -y
+      ;;
+    pacman)
+      sudo pacman -Syu --noconfirm
+      ;;
+    *)
+      echo "Unsupported package manager."
+      exit 1
+      ;;
+  esac
+}
+
+# Function to clean up unnecessary packages
+clean_system() {
+  local pm=$1
+  case $pm in
+    apt)
+      sudo apt autoremove -y && sudo apt clean
+      ;;
+    dnf)
+      sudo dnf autoremove -y && sudo dnf clean all
+      ;;
+    pacman)
+      sudo pacman -Rns $(pacman -Qdtq) --noconfirm
+      ;;
+    *)
+      echo "Unsupported package manager."
+      exit 1
+      ;;
+  esac
+}
+
 # Get the name of the distribution
 name=$(grep '^NAME=' /etc/os-release | cut -d '=' -f 2 | tr -d '"' | cut -d ' ' -f 1)
 
-pm=""
 # Determine the package manager based on the distribution name
-if [ "$name" == "Ubuntu" ]; then
-	pm="apt"
-elif [ "$name" == "Fedora" ]; then
-	pm="dnf"
-elif [[ "$name" == "Arch" || "$name" == "Arch Linux" ]]; then
-  pm="pacman"
-else
-  echo "Package manager not supported yet."
-  exit 1
-fi
+case $name in
+  Ubuntu)
+    pm="apt"
+    ;;
+  Fedora)
+    pm="dnf"
+    ;;
+  Arch | "Arch Linux")
+    pm="pacman"
+    ;;
+  *)
+    echo "Package manager not supported yet."
+    exit 1
+    ;;
+esac
 
 # Ask the user what action to perform
 echo "What do you want to do?"
+echo "Working on Ubuntu, Fedora and Arch."
 echo "1. Update system;"
 echo "2. Clean up unnecessary packages;"
 echo "3. Clear trash;"
 echo "4. Exit."
-read number
+read -r number
 
-# System update
-if [ "$number" == "1" ]; then
-  # Update for apt (Ubuntu-based systems)
-  if [ "$pm" == "apt" ]; then
-    sudo apt update && sudo apt upgrade -y
-  # Update for dnf (Fedora-based systems)
-  elif [ "$pm" == "dnf" ]; then
-    sudo dnf check-update && sudo dnf upgrade -y
-  # Update for pacman (Arch-based systems)
-  elif [ "$pm" == "pacman" ]; then
-    sudo pacman -Syu --noconfirm
-  fi
+# Perform the action based on the user's choice
+case $number in
+  1) system_update "$pm" ;;
+  2) clean_system "$pm" ;;
+  3) clear_trash ;;
+  4) echo "Exiting..."; exit 0 ;;
+  *) echo "Invalid option. Exiting."; exit 1 ;;
+esac
 
-# Cleanup unnecessary packages
-elif [ "$number" == "2" ]; then
-  # Cleanup for apt (Ubuntu-based systems)
-  if [ "$pm" == "apt" ]; then
-    sudo apt autoremove -y && sudo apt clean
-  # Cleanup for dnf (Fedora-based systems)
-  elif [ "$pm" == "dnf" ]; then
-    sudo dnf autoremove -y && sudo dnf clean all
-  # Cleanup for pacman (Arch-based systems)
-  elif [ "$pm" == "pacman" ]; then
-    sudo pacman -Rns $(pacman -Qdtq) --noconfirm
-  fi
-
-# Clear the trash
-elif [ "$number" == "3" ]; then
-  clear_trash
-
-# Exit the script
-elif [ "$number" == "4" ]; then
-  echo "Exiting..."
-  exit 0
-
-# Handle invalid input from the user
-else
-  echo "Invalid option. Exiting."
-  exit 1
-fi
+echo "Operation completed."
